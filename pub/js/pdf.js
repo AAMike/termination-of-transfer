@@ -25,37 +25,40 @@ var PDF = {};
 
 PDF.url = 'result-pdf.php';
 
-PDF.resultsToArgs = {
-  work_title: 'Title of Work',
-  work_copyright_reg_num: 'Registration Number',
-  creation_year: 'Created',
-  pub_year: 'Published',
-  reg_year: 'Copyrighted',
-  termination_type: 'Termination Type',
-  //'': 'Notice Window',
-  //'': 'Termination Window',
-  work_agreement_type: 'Agreement or Transfer Type',
-  work_agreement_desc: 'Agreement or Transfer Description',
-  work_authors: 'Author',
-  //'': 'Grantor',
-  k_year: 'Grant Date',
+PDF.appendWindowDetails = function (details) {
+  var noticeWindow = Rules.noticeWindow();
+  if (noticeWindow) {
+    details.push({key: "Notice Window Beginning",
+                  value: noticeWindow.beginning});
+    details.push({key: "Notice Window Ending",
+                  value: noticeWindow.ending});
+  }
+  var termWindow = Rules.terminationWindow();
+  if (termWindow) {
+    details.push({key: "Termination Window Beginning",
+                  value: termWindow.beginning});
+    details.push({key: "Termination Window Ending",
+                  value: termWindow.ending});
+  }
+  return details;
 };
 
 PDF.details = function () {
   var details = [];
-  Object.getOwnPropertyNames(PDF.resultsToArgs).forEach(function (key) {
+  Object.getOwnPropertyNames(varsToTitles).forEach(function (key) {
     if (Values[key] ) {
-      var mapping = {key: PDF.resultsToArgs[key],
+      var mapping = {key: varsToTitles[key],
                      value: Values[key]};
       details.push(mapping);
     }
   });
-  return details;
+  return PDF.appendWindowDetails(details);
 };
 
 PDF.request = function () {
   var data = {report_timestamp: Values.current_date.getTime()/1000,
-              flags: Values.flags,
+              flags: Values.flags.sort(), // Sorts inline & returns, so OK here
+              conclusion: Values.conclusion,
               details: PDF.details(),
              };
   var totform = document.createElement("FORM");

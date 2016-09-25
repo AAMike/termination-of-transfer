@@ -32,10 +32,11 @@ Rules.simpleYesNoRule = function (variable_id, yesValue, noValue) {
 };
 
 Rules.jumpToSectionThree = 's3q3a';
+Rules.jumpToFinish = 'finish';
 
 Rules.conclusion = function (conclusion) {
   Values.conclusion = conclusion;
-  return Rules.jumpToSectionThree;
+  return Rules.jumpToFinish;
 };
 
 Rules.conclusionPDF = function (conclusion) {
@@ -49,35 +50,112 @@ Rules.addFlag = function(flag) {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Date range calculations
+////////////////////////////////////////////////////////////////////////////////
+
+Rules.noticeWindow = function () {
+  var window = false;
+  if (Values.notice_begin){
+    window = {
+      beginning: Values.notice_begin,
+      ending: Values.notice_end
+    };
+  }
+  if (Values.d_notice_begin){
+    window = {
+      beginning: Values.d_notice_begin,
+      ending: Values.d_notice_end
+    };
+  }
+  if (Values.p_notice_begin){
+    window = {
+      beginning: Values.p_notice_begin,
+      ending: Values.p_notice_end
+    };
+  }
+  return window
+};
+
+Rules.terminationWindow = function () {
+  var window = false;
+  if (Values.term_begin) {
+    window = {
+      beginning: Values.term_begin,
+      ending: Values.term_end
+    };
+  }
+  if (Values.d_notice_begin){
+    window = {
+      beginning: Values.d_term_begin,
+      ending: Values.d_term_end
+    };
+  }
+  if (Values.p_notice_begin){
+    window = {
+      beginning: Values.p_term_begin,
+      ending: Values.p_term_end
+    };
+  }
+  return window;
+};
+
+
+Rules.hasPublicDomainFlags = function () {
+  var result = false;
+  for (var i = 0; i < Values.flags.length; i++) {
+    if (Values.flags[i][0] == 'B') {
+      result = true;
+    }
+  }
+  return result;
+};
+
+Rules.beforeEndOfNoticeWindow = function () {
+  return ((Values.notice_end != undefined)
+          && (Values.notice_end >= Values.current_year))
+    || ((Values.d_notice_end != undefined)
+        && (Values.d_notice_end >= Values.current_year))
+    || ((Values.p_notice_end != undefined)
+        && (Values.p_notice_end >= Values.current_year));
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Section N Analyses
 ////////////////////////////////////////////////////////////////////////////////
 
 Rules.section304Analysis = function () {
-  var result = 's1q1f'
+  var result = 's1q1f';
   if (Values.k_year < 1978) {
-    if ((Values.pub_year == undefined)
-        && (Values.reg_year == undefined)) {
+    result = 's2q2a';
+    if ((Values.pub_year == undefined) && (Values.reg_year == undefined)) {
       result = Rules.conclusion('B.vii');
     } else {
-      var cright_year = Math.min(Values.pub_year,
-                                 Values.reg_year);
-      var term_begin = cright_year + 56;
-      term_begin = Math.max(term_begin, 1978);
-      var term_end = term_begin + 5;
-      notice_begin = term_begin - 10;
-      notice_end = term_end - 2;
-      if (notice_begin > Values.current_year) {
+      Values.cright_year = Values.pub_year;
+      // If the work is registered (not all works are!), use the min of pub/reg
+      if (Values.reg_year != undefined) {
+        Values.cright_year = Math.min(Values.pub_year,
+                                      Values.reg_year);
+      }
+      if (Values.cright_year < 1950) {
+        Rules.addFlag('B.iv');
+      }
+      Values.term_begin = Values.cright_year + 56;
+      Values.term_begin = Math.max(Values.term_begin, 1978);
+      Values.term_end = Values.term_begin + 5;
+      Values.notice_begin = Values.term_begin - 10;
+      Values.notice_end = Values.term_end - 2;
+      if (Values.notice_begin > Values.current_year) {
         Rules.addFlag('A.i.a');
-      } else if (notice_end < Values.current_year) {
-        if (cright_year < 1938) {
-          var d_term_begin = term_begin + 19;
-          var d_term_end = d_term_begin + 5;
-          var d_notice_begin = d_term_begin - 10;
-          var d_notice_end = d_term_end - 2;
-          if (d_notice_begin > Values.current_year) {
-            result = Rules.conclusion('A.iii.a');
-          } else if (notice_end < Values.current_year) {
-            result = Rules.conclusion('A.ii.a');
+      } else if (Values.notice_end < Values.current_year) {
+        if (Values.cright_year < 1938) {
+          Values.d_term_begin = Values.term_begin + 19;
+          Values.d_term_end = Values.d_term_begin + 5;
+          Values.d_notice_begin = Values.d_term_begin - 10;
+          Values.d_notice_end = Values.d_term_end - 2;
+          if (Values.d_notice_begin > Values.current_year) {
+            Rules.addFlag('A.iii.a');
+          } else if (Values.notice_end < Values.current_year) {
+            Rules.addFlag('A.ii.a');
           } else {
             result = Rules.conclusion('B.ii');
           }
@@ -86,49 +164,50 @@ Rules.section304Analysis = function () {
         }
       }
     }
-  } else {
-    result = 's1q1f';
   }
   return result;
 };
 
 Rules.section203Analysis = function () {
   var result = 's2q2a';
-  var term_begin = undefined;
-  if (Values.pub_right == true ) {
-    if (Values.pub_year != undefined) {
-      term_begin = Math.min(Values.pub_year + 35 , Values.k_year + 40);
-    } else {
-      term_begin = Values.k_year + 40;
+  if (Values.k_year > 1977) {
+    var term_begin = undefined;
+    if (Values.pub_right == true ) {
+      if (Values.pub_year != undefined) {
+        Values.term_begin = Math.min(Values.pub_year + 35 , Values.k_year + 40);
+      } else {
+        Values.term_begin = Values.k_year + 40;
+      }
+    } else if ((Values.pub_year != Values.k_year)
+               || (Values.pub_right == 'no'))  {
+      Values.term_begin = Values.k_year + 35;
     }
-  } else if (Values.pub_year != Values.k_year ) {
-    term_begin = Values.k_year + 35;
-  }
-  if (term_begin != undefined) {
-    var term_end = term_begin + 5;
-    var notice_begin = term_begin - 10;
-    var notice_end = term_end - 2;
-    if (notice_begin > Values.current_year) {
-      result = Rules.conclusion('B.i');
-    } else if (notice_end < Values.current_year) {
-      result = Rules.conclusion('B.ii');
+    if (Values.term_begin != undefined) {
+      Values.term_end = Values.term_begin + 5;
+      Values.notice_begin = Values.term_begin - 10;
+      Values.notice_end = Values.term_end - 2;
+      if (Values.notice_begin > Values.current_year) {
+        result = Rules.conclusion('B.i');
+      } else if (Values.notice_end < Values.current_year) {
+        result = Rules.conclusion('B.ii');
+      }
     }
-  }
-  if (Values.pub_right == undefined) {
-    var p_term_begin = Math.min(Values.pub_year + 35,
-                                Values.k_year + 40);
-    var p_term_end = p_term_begin  + 5;
-    var p_notice_begin = p_term_begin - 10;
-    var p_notice_end = p_term_end - 2;
-
-    if (p_notice_begin > Values.current_year) {
-      result = Rules.conclusion('B.i');
-    } else if (p_notice_end < Values.current_year) {
-      result = Rules.conclusion('B.ii');
+    if (Values.pub_right == 'no') {
+      Values.p_term_begin = Math.min(Values.pub_year + 35,
+                                     Values.k_year + 40);
+      Values.p_term_end = Values.p_term_begin  + 5;
+      Values.p_notice_begin = Values.p_term_begin - 10;
+      Values.p_notice_end = Values.p_term_end - 2;
+      if (Values.p_notice_begin > Values.current_year) {
+        result = Rules.conclusion('B.i');
+      } else if (Values.p_notice_end < Values.current_year) {
+        result = Rules.conclusion('B.ii');
+      }
     }
   }
   return result;
 };
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section 1
@@ -150,8 +229,10 @@ Rules.s1q1bi = function () {
   var result = undefined;
   if (Values.pub_year < 1923) {
     result = Rules.conclusion('B.viii');
-  } else {
+  } else if (Values.pub_year < 1990)
     result = 's1q1bi2';
+  else {
+    result = 's1q1c';
   }
   return result;
 };
@@ -166,21 +247,30 @@ Rules.s1q1bi2 = function () {
     // The same
     result = 's1q1c';
     if (Values.pub_year < 1989) {
-      Rules.addFlag('Flag B.i');
+      Rules.addFlag('B.i');
     } else {
-      Rules.addFlag('Flag B.ii');
+      Rules.addFlag('B.ii');
     }
   } else /* maybe */ {
-    Rules.addFlag('Flag B.iii');
+    Rules.addFlag('B.iii');
   }
   return result;
 };
 
 // Has the work been registered with the United State Copyright Office?
 
-Rules.s1q1c = Rules.simpleYesNoRule('work_registered',
-                                    's1q1ci',
-                                    's1q1d');
+Rules.s1q1c = function () {
+  var result = undefined;
+  if (Values.work_registered == 'yes') {
+    result = 's1q1ci';
+  } else if (Values.work_registered == 'no') {
+    result = 's1q1d';
+  } else /* don't know */ {
+    // If someone doesn't know, continue without asking for registration number
+    result = 's1q1d';
+  }
+  return result;
+};
 
 // When was the work registered with the United States Copyright Office?
 
@@ -189,11 +279,32 @@ Rules.s1q1ci = 's1q1d';
 // For s1q1d,
 // What is the date of the agreement or transfer? ...
 
-Rules.s1q1d = Rules.section304Analysis;
+Rules.s1q1d = function () {
+  // Intercept the result so we can add encouragement if things look good
+  var result = Rules.section304Analysis();
+  if ((result != Rules.jumpToFinish)
+      && Rules.beforeEndOfNoticeWindow()
+      && (! Rules.hasPublicDomainFlags())) {
+    Notifications.setEncouragement("Both notice window and copyright status look good, let's get some more details!");
+  }
+  return result;
+};
 
 // Did the agreement or transfer include the right of publication?
 
-Rules.s1q1f = Rules.section203Analysis;
+Rules.s1q1f = function () {
+  // Intercept the result so we can add encouragement if things look good
+  var result = Rules.section203Analysis();
+  if ((result != Rules.jumpToFinish)
+      && Rules.beforeEndOfNoticeWindow()
+      && (! Rules.hasPublicDomainFlags())) {
+    Notifications.setEncouragement("Both notice window and copyright status look good, let's get some more details!");
+  }
+  return result;
+};
+
+
+Rules.section203Analysis;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section 2
@@ -204,7 +315,7 @@ Rules.s1q1f = Rules.section203Analysis;
 Rules.s2q2a = function () {
   var result = undefined;
   if (Values.last_will == 'yes') {
-    result = Rules.conclusion(B.iv);
+    result = Rules.conclusion('B.iv');
   } else {
     result = 's2q2b';
   }
@@ -245,9 +356,9 @@ Rules.s2q2c = function () {
   var result = undefined;
   if (Values.special_order == 'yes') {
     if (Values.creation_year < 1978) {
-      result = Rules.conclusion('B.iii');
+      result = Rules.conclusion('D.i');
     } else {
-      result = 's2q2cia';
+      result = 's2q2ci';
     }
   } else {
     result = 's2q2d';
@@ -276,18 +387,29 @@ Rules.s2q2ci = function () {
 Rules.s2q2cia = function () {
   var result = undefined;
   if (Values.created_as_part_of_motion_picture == 'yes') {
-    result = Rules.conclusion('B.ii');
+    result = Rules.conclusion('C.ii');
   } else if (Values.created_as_part_of_motion_picture == 'no') {
     result = 's2q2d';
   } else /* don't know */ {
-    //FIXME: WAITING FOR SPEC
+    Rules.addFlag('D.ii');
+    result = 's2q2d';
   }
   return result;
 };
 
 // Has the original transfer since been renegotiated or altered?
 
-Rules.s2q2d = 's2q2e';
+Rules.s2q2d = function () {
+  var result = 's2q2e';
+  if (Values.renego == 'yes') {
+    Rules.addFlag('C.i');
+  } else if (Values.renego == 'no') {
+    // Continue
+  } else /* don't know */ {
+    Rules.addFlag('C.ii');
+  }
+  return result;
+};
 
 // Did one or more of the authors or artists enter into the agreement...
 
@@ -326,7 +448,7 @@ Rules.s2q2eii = function () {
 
 Rules.s3q3a = function () {
   var result = undefined;
-  if (Values.work_registered) {
+  if (Values.work_registered == 'yes') {
     result = 's3q3b';
   } else {
     result = 's3q3c';
